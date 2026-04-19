@@ -9,49 +9,57 @@ DATE: April 2026
 -- Step 1: Data Preparation & Cleaning
 -- Creating a View to handle NULL values and standardize text fields
 
+-- STEP 1: SET THE CONTEXT
+-- This tells SQL exactly which "folder" to look in.
+USE superstore;
+SHOW TABLES;
+
+-- STEP 2: CREATE THE DATA ENGINE (VIEW)
+-- We include ALL necessary columns here so every query below works.
+
+USE superstore;
 
 CREATE OR REPLACE VIEW clean_superstore AS
 SELECT
-  Order_ID,
-  Category,
-  TRIM(Customer_Name) AS customer_name,
-  UPPER(Region) AS region,
-  Sales,
-  Profit,
-  Quantity
-FROM superstore
+    `Order ID` AS order_id,
+    `Order Date`,
+    `Customer ID`,
+    `Segment`,
+    `Category`,
+    `Sub-Category`, -- Added this for the bleeding report
+    TRIM(`Customer Name`) AS customer_name,
+    UPPER(`Region`) AS region,
+    Sales,
+    Profit,
+    Quantity
+FROM `sample - superstore`
 WHERE Sales IS NOT NULL 
   AND Profit IS NOT NULL;
 
--- Query 1: Regional Performance Audit
--- Analyzing which regions generate the best margins
+-- ==========================================================
+-- STEP 3: EXECUTE BUSINESS QUESTIONS
+-- ==========================================================
 
-
+-- Q1: Which regions are most profitable? (Regional Audit)
 SELECT 
     region, 
     ROUND(SUM(Sales), 2) AS total_sales,
     ROUND(SUM(Profit), 2) AS total_profit,
-    ROUND((SUM(Profit)/SUM(Sales))*100, 2) AS profit_margin_pct
+    ROUND((SUM(Profit) / NULLIF(SUM(Sales), 0)) * 100, 2) AS profit_margin_pct
 FROM clean_superstore
 GROUP BY region
 ORDER BY total_profit DESC;
 
--- Query 2: The "Bleeding" Report (Least Profitable Categories)
--- Identifying categories currently operating at a loss
-
-
+-- Q2: Which categories are losing money? (The Bleeding Report)
 SELECT 
-    Category AS product_category, 
+    `Sub-Category` AS product_type, 
     ROUND(SUM(Profit), 2) AS total_profit 
 FROM clean_superstore 
-GROUP BY Category 
+GROUP BY `Sub-Category` 
 HAVING total_profit < 0 
 ORDER BY total_profit ASC;
 
--- Query 3: Top Customer Contribution
--- Identifying high-value customers for loyalty programs
-
-
+-- Q3: Who are our top 5 "Value" customers? (Loyalty Analysis)
 SELECT 
     customer_name,
     ROUND(SUM(Sales), 2) AS total_spend,
@@ -61,22 +69,29 @@ GROUP BY customer_name
 ORDER BY total_profit_contribution DESC
 LIMIT 5;
 
--- 4. Monthly sales trend
+-- Q4: How are sales trending month-over-month? (Time Series)
+-- Note: Adjust format to '%d/%m/%Y' if your data is Day/Month/Year
 SELECT 
-  DATE_FORMAT(STR_TO_DATE(`Order Date`, '%m/%d/%Y'), '%Y-%m') AS month,
-  ROUND(SUM(Sales), 2) AS monthly_sales
+    DATE_FORMAT(STR_TO_DATE(`Order Date`, '%m/%d/%Y'), '%Y-%m') AS month,
+    ROUND(SUM(Sales), 2) AS monthly_sales
 FROM clean_superstore
 GROUP BY month
 ORDER BY month;
 
--- 5. Customer segment profitability
-SELECT Segment,
-  COUNT(DISTINCT `Customer ID`) AS customers,
-  ROUND(SUM(Sales), 2) AS total_sales,
-  ROUND(SUM(Profit), 2) AS total_profit
+-- Q5: Which customer segment is most efficient? (Segment Profitability)
+SELECT 
+    Segment,
+    COUNT(DISTINCT `Customer ID`) AS unique_customers,
+    ROUND(SUM(Sales), 2) AS total_sales,
+    ROUND(SUM(Profit), 2) AS total_profit
 FROM clean_superstore
 GROUP BY Segment
 ORDER BY total_profit DESC;
+
+
+
+
+
 
 
 /* 2. Executive Summary (The 1-Page Written Piece)
